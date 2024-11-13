@@ -75,7 +75,6 @@ public class LoginFilter extends UsernamePasswordAuthenticationFilter {
 
     @Override
     protected void successfulAuthentication(HttpServletRequest request, HttpServletResponse response, FilterChain chain, Authentication authentication) throws ServletException, IOException {
-
         //유저 정보
         String username = authentication.getName();
 
@@ -85,32 +84,24 @@ public class LoginFilter extends UsernamePasswordAuthenticationFilter {
         String role = auth.getAuthority();
 
         //토큰 생성
-        String access = jwtUtil.createJwt("access", username, role, 1000L * 60 * 60 * 24 * 60);
-//        String access = jwtUtil.createJwt("access", username, role, 600000L);
-        String refresh = jwtUtil.createJwt("refresh", username, role, 86400000L);
+        String access = jwtUtil.createJwt("access", username, role, 1000L * 60 * 10);
+        String refresh = jwtUtil.createJwt("refresh", username, role, 1000L * 60 * 60 * 24);
 
         //Refresh 토큰 저장
-        addRefreshEntity(username, refresh, 86400000L);
+        addRefreshEntity(username, refresh, 1000L * 60 * 60 * 24);
 
         //응답 설정
-        response.setHeader("Authorization", access);
-//        response.setHeader("Authorization", "Bearer "+access);
-//        response.setHeader("access", access);
-        response.addCookie(createCookie("refresh", refresh));
+        response.setHeader("Authorization", access); //access Token은 헤더에 저장
+        response.addCookie(createCookie("refresh", refresh)); //refresh Token은 Cookie에 저장
         response.setStatus(HttpStatus.OK.value());
 
-
-        // 브라우저에서 Authorization 헤더를 사용할 수 있도록 설정
+        //client에서 Authorization 헤더를 사용할 수 있도록 설정
         response.setHeader("Access-Control-Expose-Headers", "Authorization");
         SecurityContextHolder.getContext().setAuthentication(authentication);
 
         CustomUserDetails customUserDetails = (CustomUserDetails) authentication.getPrincipal();
         request.setAttribute("user", customUserDetails.getUser());
 
-        //TODO 원인 분석 필요
-        log.info("Request URI: {}", request.getRequestURI());
-        log.info("Request Method: {}", request.getMethod());
-        log.info("요청이 로그인 필터에 들어왔습니다. access설정");
         chain.doFilter(request, response);
     }
 
@@ -122,27 +113,20 @@ public class LoginFilter extends UsernamePasswordAuthenticationFilter {
 
     //쿠키생성 메서드
     private Cookie createCookie(String key, String value) {
-
         Cookie cookie = new Cookie(key, value);
         cookie.setMaxAge(24*60*60);
-        //TODO https일경우 설정해줘야함.
-        //cookie.setSecure(true);
-        //cookie.setPath("/");
         //client에서 js를 사용해서 쿠키에 접근할 수 없도록 막아주는 설정
         cookie.setHttpOnly(true);
-
         return cookie;
     }
+
     //refresh토큰을 db에 저장한다.//TODO 향후, redis로 변경해야함
     private void addRefreshEntity(String username, String refresh, Long expiredMs) {
-
         Date date = new Date(System.currentTimeMillis() + expiredMs);
-
         RefreshEntity refreshEntity = new RefreshEntity();
         refreshEntity.setUsername(username);
         refreshEntity.setRefresh(refresh);
         refreshEntity.setExpiration(date.toString());
-
         refreshRepository.save(refreshEntity);
     }
 }
