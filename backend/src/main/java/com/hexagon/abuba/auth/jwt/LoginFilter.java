@@ -115,8 +115,10 @@ public class LoginFilter extends UsernamePasswordAuthenticationFilter {
     private Cookie createCookie(String key, String value) {
         Cookie cookie = new Cookie(key, value);
         cookie.setMaxAge(24*60*60);
-        //client에서 js를 사용해서 쿠키에 접근할 수 없도록 막아주는 설정
+        //client에서 js를 사용해서 쿠키에 접근할 수 없도록 막음.
         cookie.setHttpOnly(true);
+        //path 설정
+        cookie.setPath("/reissue");
         return cookie;
     }
 
