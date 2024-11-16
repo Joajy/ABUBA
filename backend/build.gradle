@@ -73,6 +73,10 @@ dependencies {
 
 	implementation platform('org.springframework.cloud:spring-cloud-gcp-dependencies:1.2.8.RELEASE')
 	implementation 'org.springframework.cloud:spring-cloud-gcp-starter-vision'
+
+	//redis
+	implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+
 }
 
 tasks.named('test') {
