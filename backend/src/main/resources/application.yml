@@ -2,7 +2,7 @@ spring:
   application:
     name: abuba
   profiles:
-      active: prod
+      active: local
   jwt:
     secret: spring.jwt.secret=vmfhaltmskdlstkfkdgodyroqkfwkdbalroqkfwkdbalaaaaaaaaaaaaaaaabbbbb
   jpa:

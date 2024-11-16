@@ -6,6 +6,7 @@ import com.hexagon.abuba.auth.jwt.JWTUtil;
 import com.hexagon.abuba.auth.jwt.LoginFilter;
 import com.hexagon.abuba.auth.repository.RefreshRepository;
 import com.hexagon.abuba.auth.service.CustomUserDetailsService;
+import com.hexagon.abuba.infra.redis.RefreshTokenService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -20,7 +21,6 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.security.web.authentication.logout.LogoutFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
-import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.Collections;
 
@@ -32,13 +32,16 @@ public class SecurityConfig {
     private final JWTUtil jwtUtil;
     private final RefreshRepository refreshRepository;
     private final CustomUserDetailsService customUserDetailsService;
+    private final RefreshTokenService refreshTokenService;
 
-    public SecurityConfig(AuthenticationConfiguration authenticationConfiguration, JWTUtil jwtUtil, RefreshRepository refreshRepository, CustomUserDetailsService customUserDetailsService) {
+    public SecurityConfig(AuthenticationConfiguration authenticationConfiguration, JWTUtil jwtUtil, RefreshRepository refreshRepository, CustomUserDetailsService customUserDetailsService,
+                          RefreshTokenService refreshTokenService) {
 
         this.authenticationConfiguration = authenticationConfiguration;
         this.jwtUtil = jwtUtil;
         this.refreshRepository = refreshRepository;
         this.customUserDetailsService = customUserDetailsService;
+        this.refreshTokenService = refreshTokenService;
     }
 
     @Bean
@@ -55,7 +58,8 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        LoginFilter loginFilter = new LoginFilter(authenticationManager(authenticationConfiguration), jwtUtil, refreshRepository);
+        LoginFilter loginFilter = new LoginFilter(authenticationManager(authenticationConfiguration), jwtUtil, refreshRepository,
+                refreshTokenService);
         loginFilter.setFilterProcessesUrl("/api/v1/auth/login");
 
         http
@@ -66,7 +70,6 @@ public class SecurityConfig {
                         CorsConfiguration configuration = new CorsConfiguration();
 
                         configuration.addAllowedOriginPattern("*");
-//						configuration.setAllowedOrigins(Collections.singletonList("*"));
                         configuration.setAllowedMethods(Collections.singletonList("*"));
                         configuration.setAllowCredentials(true);
                         configuration.setAllowedHeaders(Collections.singletonList("*"));
@@ -80,7 +83,7 @@ public class SecurityConfig {
         http
                 .csrf((auth) -> auth.disable());
 
-        //From 로그인 방식 disable
+        //Form 로그인 방식 disable
         http
                 .formLogin((auth) -> auth.disable());
 
@@ -94,7 +97,7 @@ public class SecurityConfig {
                         .requestMatchers("/v3/**", "/swagger-ui/**","/swagger/**","/docs/**").permitAll()// Swagger UI 및 API 문서 접근 허용
                         .requestMatchers("/api/v1/auth/login", "/",
                                 "/api/v1/auth/signup", "/api/v1/auth/logout",
-                                "/api/v1/auth/verify-email","/api/v1/auth/send-email").permitAll()
+                                "/api/v1/auth/verify-email","/api/v1/auth/send-email", "/api/v1/auth/reissue").permitAll()
                         .requestMatchers("/reissue").permitAll()
                         .anyRequest().authenticated());
         http

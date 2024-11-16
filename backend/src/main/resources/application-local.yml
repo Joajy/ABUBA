@@ -24,6 +24,7 @@ spring:
       max-request-size: 300MB
       max-file-size: 50MB
 
+
 aws:
   s3:
     access-key: ${AWS_ACCESS_KEY}
@@ -31,6 +32,9 @@ aws:
     bucket-name: hexagon-abuba
     region: ap-northeast-2
 
+naver:
+  client-id: ${CLIENT_ID}
+  client-secret: ${CLIENT_SECRET}
 
 app:
   email:

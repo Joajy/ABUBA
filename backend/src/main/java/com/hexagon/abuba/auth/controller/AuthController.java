@@ -5,14 +5,22 @@ import com.hexagon.abuba.auth.dto.request.LoginDTO;
 import com.hexagon.abuba.auth.dto.request.SendEmailDTO;
 import com.hexagon.abuba.auth.dto.request.VerifyEmailDTO;
 import com.hexagon.abuba.auth.dto.response.LoginResDTO;
+import com.hexagon.abuba.auth.entity.RefreshEntity;
+import com.hexagon.abuba.auth.jwt.JWTUtil;
+import com.hexagon.abuba.auth.repository.RefreshRepository;
 import com.hexagon.abuba.auth.service.AuthService;
 import com.hexagon.abuba.common.DataResponse;
 import com.hexagon.abuba.common.MessageResponse;
+import com.hexagon.abuba.infra.redis.RefreshTokenService;
 import com.hexagon.abuba.user.Parent;
+import io.jsonwebtoken.ExpiredJwtException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import java.util.Date;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -26,10 +34,17 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final AuthService authService;
+    private final JWTUtil jwtUtil;
+    private final RefreshRepository refreshRepository;
+    private final RefreshTokenService refreshTokenService;
 
     @Autowired
-    public AuthController(AuthService authService) {
+    public AuthController(AuthService authService, JWTUtil jwtUtil, RefreshRepository refreshRepository,
+                          RefreshTokenService refreshTokenService) {
         this.authService = authService;
+        this.jwtUtil = jwtUtil;
+        this.refreshRepository = refreshRepository;
+        this.refreshTokenService = refreshTokenService;
     }
 
     @Operation(summary = "회원가입", description = "신규 유저가 회원가입합니다.")
@@ -79,4 +94,87 @@ public class AuthController {
             return ResponseEntity.badRequest().body("잘못된 또는 만료된 인증 토큰입니다.");
         }
     }
+
+    //refresh토큰
+    @PostMapping("/reissue")
+    public ResponseEntity<?> reissue(HttpServletRequest request, HttpServletResponse response) {
+
+        // Refresh Token 쿠키에서 가져오기
+        String refresh = null;
+        Cookie[] cookies = request.getCookies();
+        for (Cookie cookie : cookies) {
+
+            if (cookie.getName().equals("refresh")) {
+
+                refresh = cookie.getValue();
+            }
+        }
+
+        if (refresh == null) {
+
+            //response status code
+            return new ResponseEntity<>("refresh token null", HttpStatus.BAD_REQUEST);
+        }
+
+        //expired check
+        try {
+            jwtUtil.isExpired(refresh);
+        } catch (ExpiredJwtException e) {
+            //response status code
+            return new ResponseEntity<>("refresh token expired", HttpStatus.BAD_REQUEST);
+        }
+
+        // 토큰이 refresh인지 확인 (발급시 페이로드에 명시)
+        String category = jwtUtil.getCategory(refresh);
+
+        if (!category.equals("refresh")) {
+            //response status code
+            return new ResponseEntity<>("invalid refresh token", HttpStatus.BAD_REQUEST);
+        }
+
+        // Redis에서 Refresh Token 조회
+        String username = jwtUtil.getUsername(refresh);
+        String storedRefreshToken = refreshTokenService.getRefreshToken(username);
+        if (storedRefreshToken == null || !storedRefreshToken.equals(refresh)) {
+            return new ResponseEntity<>("Invalid refresh token", HttpStatus.BAD_REQUEST);
+        }
+
+        // 새로운 Access Token과 Refresh Token 생성
+        String role = jwtUtil.getRole(refresh);
+        String newAccess = jwtUtil.createJwt("access", username, role, 1000L * 60 * 10); // 10분
+        String newRefresh = jwtUtil.createJwt("refresh", username, role, 1000L * 60 * 60 * 24); // 24시간
+
+        // Redis 갱신
+        refreshTokenService.saveRefreshToken(username, newRefresh, 1000L * 60 * 60 * 24);
+
+        // 응답 설정
+        response.setHeader("Authorization", newAccess);
+        response.addCookie(createCookie("refresh", newRefresh));
+
+        return new ResponseEntity<>(HttpStatus.OK);
+    }
+
+    //쿠키생성 메서드
+    private Cookie createCookie(String key, String value) {
+        Cookie cookie = new Cookie(key, value);
+        cookie.setMaxAge(24*60*60);
+        //client에서 js를 사용해서 쿠키에 접근할 수 없도록 막음.
+        cookie.setHttpOnly(true);
+        //path 설정
+        cookie.setPath("/reissue");
+        return cookie;
+    }
+
+    private void addRefreshEntity(String username, String refresh, Long expiredMs) {
+
+        Date date = new Date(System.currentTimeMillis() + expiredMs);
+
+        RefreshEntity refreshEntity = new RefreshEntity();
+        refreshEntity.setUsername(username);
+        refreshEntity.setRefresh(refresh);
+        refreshEntity.setExpiration(date.toString());
+
+        refreshRepository.save(refreshEntity);
+    }
+
 }

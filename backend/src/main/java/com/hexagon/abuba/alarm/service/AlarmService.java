@@ -42,12 +42,10 @@ public class AlarmService {
         SseEmitter oldEmitter = sseEmitters.get(username);
         if (oldEmitter != null) {
             oldEmitter.complete();
-            sseEmitters.remove(username);  // 명확하게 이전 Emitter 제거
+            sseEmitters.remove(username);//이전 Emitter 제거
         }
-
         SseEmitter emitter = new SseEmitter(Long.MAX_VALUE);  // 새로운 Emitter 생성
-        sseEmitters.put(username, emitter);
-//        log.info("새로운 emitter생성 emitter={}", emitter);
+        sseEmitters.put(username, emitter); //concurrentHashMap에 넣음
         // Emitter의 종료 시점 처리
         emitter.onCompletion(() -> {
             log.info("SSE Connection Completed for user: {}", username);
@@ -61,14 +59,12 @@ public class AlarmService {
             log.error("SSE Connection Error for user: {}", username, e);
             sseEmitters.remove(username);  // 오류 시 Emitter 제거
         });
-
         try {
             emitter.send(SseEmitter.event().name("connect").data("Connected"));
         } catch (IOException e) {
             log.error("Error sending initial connection event to user: {}", username, e);
             sseEmitters.remove(username);
         }
-
         return emitter;
     }
 
@@ -110,12 +106,6 @@ public class AlarmService {
             log.warn("No active emitter found for user: {}", username);
         }
     }
-
-//    @Scheduled(fixedRate = 60000) // 1분마다 실행
-//    public void logActiveConnections() {
-//        log.info("Active SSE connections: {}", sseEmitters.size());
-//    }
-
 
     public List<AlarmResponseDTO> getAlarms(Long parentId) {
         List<AlarmResponseDTO> response = new ArrayList<>();
