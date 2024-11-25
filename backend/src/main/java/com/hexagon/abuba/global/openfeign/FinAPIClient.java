@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 
 import java.util.Optional;
 
-@FeignClient(name = "FinAPI", url = "https://finopenapi.ssafy.io/ssafy/api/v1")
+@FeignClient(name = "FinAPI", url = "")
 public interface FinAPIClient {
 
     @PostMapping("/member")
